@@ -19,7 +19,7 @@ env/
 *.ipynb~
 
 # Data (raw CSVs — too large for version control)
-data/
+/data/
 *.csv
 
 # OS
