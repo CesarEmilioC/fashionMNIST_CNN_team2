@@ -28,10 +28,15 @@ from tensorflow.keras import callbacks
 
 def _configure_gpu():
     gpus = tf.config.list_physical_devices("GPU")
-    if gpus:
+    if not gpus:
+        return
+    try:
         target = gpus[-1]
         tf.config.set_visible_devices(target, "GPU")
         tf.config.experimental.set_memory_growth(target, True)
+    except RuntimeError:
+        # TF already initialized (e.g. in Colab); skip silently.
+        pass
 
 from src.models.mini_resnet import build_mini_resnet
 
