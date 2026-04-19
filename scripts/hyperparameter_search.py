@@ -61,7 +61,6 @@ def run_search(X_train, y_train, X_val, y_val,
     if configs is None:
         configs = HP_CONFIGS
 
-    _configure_gpu()
     tf.random.set_seed(seed)
     np.random.seed(seed)
 
@@ -107,6 +106,7 @@ def run_search(X_train, y_train, X_val, y_val,
 
 
 def main():
+    _configure_gpu()
     parser = argparse.ArgumentParser(description="Hyperparameter search for Mini-ResNet")
     parser.add_argument("--data-dir", default=None)
     parser.add_argument("--epochs", type=int, default=20)
