@@ -1,0 +1,5 @@
+Model,Parameters,Test Accuracy,Test Loss,Weighted F1,Train Time (s)
+Baseline CNN,421642,0.8991,0.2847,0.9,106.5
+Improved CNN,438890,0.924,0.2677,0.9253,709.6
+Mini-ResNet,2781002,0.9436,0.2371,0.9438,1985.7
+Tuned Mini-ResNet,2781002,0.9313,0.3157,0.9316,2829.1

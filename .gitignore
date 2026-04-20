@@ -20,7 +20,13 @@ env/
 
 # Data (raw CSVs — too large for version control)
 /data/
-*.csv
+/data/*.csv
+
+# Extracted Colab training zips (temporary; the contents belong in models/ and results/)
+/training_outputs/
+/training_figures/
+/training_outputs.zip
+/training_figures.zip
 
 # OS
 .DS_Store

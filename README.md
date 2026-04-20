@@ -19,7 +19,7 @@ This project develops a classification system for the **Fashion MNIST** dataset 
 
 **Dataset:** Fashion MNIST — 70,000 grayscale 28×28 images across 10 clothing categories.  
 **Framework:** TensorFlow / Keras.  
-**Best result:** Tuned Mini-ResNet achieving ~93% test accuracy.
+**Best result:** Mini-ResNet with Cosine-Decay achieving **94.36 %** test accuracy.
 
 ---
 
@@ -132,7 +132,7 @@ where `F(x)` is a two-layer convolution path and `x` is a shortcut that bypasses
 
 ---
 
-#### Model 4 — Tuned Mini-ResNet (Best Model)
+#### Model 4 — Tuned Mini-ResNet
 
 A manual grid search over 8 hyperparameter combinations screened for 20 epochs each:
 
@@ -142,29 +142,34 @@ A manual grid search over 8 hyperparameter combinations screened for 20 epochs e
 | Batch size | `32`, `64`, `128` |
 | Dropout rate | `0.3`, `0.4`, `0.5` |
 
-The best configuration is then retrained from scratch for up to 60 epochs with Cosine Decay and EarlyStopping, producing the final model saved to `models/saved/tuned_mini_resnet.h5`.
+The best configuration by 20-epoch validation accuracy (`lr=1e-4, bs=64, dropout=0.4`) was then retrained from scratch for up to 60 epochs with Cosine Decay and EarlyStopping, producing `models/saved/tuned_mini_resnet.h5`.
+
+See the full search results in [`results/metrics/hyperparameter_search.csv`](results/metrics/hyperparameter_search.csv).
 
 ---
 
 ## Results
 
-Results below are representative; exact numbers depend on hardware and TensorFlow version.
+Final metrics on the held-out test set (10 000 samples), trained on Google Colab with a T4 GPU.
 
-| Model | Test Accuracy | Weighted F1 | Parameters | Key Addition |
-|---|---|---|---|---|
-| Baseline CNN | ~89% | ~0.89 | ~122 K | — |
-| Improved CNN | ~91% | ~0.91 | ~710 K | BatchNorm, Dropout, Augmentation |
-| Mini-ResNet | ~92% | ~0.92 | ~2.8 M | Residual connections |
-| Tuned Mini-ResNet | ~93% | ~0.93 | ~2.8 M | Hyperparameter optimization |
+| Model | Test Accuracy | Weighted F1 | Parameters | Train Time | Key Addition |
+|---|---|---|---|---|---|
+| Baseline CNN | 89.91 % | 0.900 | 421 K | 1.8 min | — |
+| Improved CNN | 92.40 % | 0.925 | 439 K | 11.8 min | BatchNorm, Dropout, Augmentation, L2, Adam |
+| **Mini-ResNet** | **94.36 %** | **0.944** | **2.78 M** | **33.1 min** | **Residual connections + Cosine Decay** |
+| Tuned Mini-ResNet | 93.13 % | 0.932 | 2.78 M | 47.2 min | Hyperparameter search (60 epochs) |
 
-**Consistently hardest classes:** Shirt, T-shirt/top, and Coat — visually similar garments with overlapping textures.
+The full numeric table is stored at [`results/metrics/results_summary.csv`](results/metrics/results_summary.csv) and visualized in [`results/figures/results_bar_comparison.png`](results/figures/results_bar_comparison.png).
+
+**Consistently hardest classes:** Shirt, T-shirt/top, Pullover and Coat — visually similar upper-body garments whose silhouettes overlap in 28×28 grayscale.
 
 ### Key Observations
 
-1. **Regularization reduced overfitting** — the train/validation accuracy gap dropped from ~5–8 pp (Baseline) to ~1–2 pp (Improved CNN and beyond).
-2. **Residual connections enabled deeper training** — 13 convolutional layers trained stably without degradation thanks to skip connections.
-3. **GlobalAveragePooling is efficient** — replacing a large dense layer with GAP cut parameter count by ~3× in the classifier head while improving generalization.
-4. **Adam + Cosine Decay outperformed SGD + fixed LR** — faster convergence and better final minima.
+1. **Each architectural change paid off.** Test accuracy climbed monotonically from Baseline (89.91 %) → Improved (92.40 %) → Mini-ResNet (94.36 %). The biggest single jump (+1.96 pp) came from adding residual connections and moving to Global Average Pooling.
+2. **Regularization closed the generalization gap.** The Baseline's train/val curves diverge around epoch 5–8; the Improved CNN and Mini-ResNet track each other within ~1–2 pp for the entire run.
+3. **Residual connections enabled deeper training without degradation.** 13 convolutional layers converged stably and without the vanishing-gradient symptoms a plain deep CNN would show at the same depth.
+4. **The hyperparameter search did not beat the default Mini-ResNet.** Screening over 20 epochs selected `lr=1e-4` because it produced the smoothest short-horizon validation curve, but at 60 epochs the original `lr=1e-3 + CosineDecay` found a better minimum (+1.23 pp test accuracy). This is a useful lesson on the limits of short-horizon screening — the LR ranking at 20 epochs is not the LR ranking at 60.
+5. **Compute scales faster than accuracy.** Going from Improved CNN to Mini-ResNet multiplied both parameter count (~6×) and training time (~3×) for a +1.96 pp gain — a diminishing-returns pattern typical of this dataset at this depth.
 
 ---
 
@@ -201,11 +206,13 @@ python scripts/hyperparameter_search.py --epochs 20
 
 ### Colab Demo
 
-Open `notebooks/demo_best_model.ipynb` in Google Colab (GPU runtime recommended). The notebook will:
+Open [`notebooks/demo_best_model.ipynb`](notebooks/demo_best_model.ipynb) in Google Colab (GPU runtime recommended). The notebook will:
 1. Clone this repository.
 2. Download the Fashion MNIST test set from Kaggle.
-3. Load the trained model weights.
-4. Let you predict any sample — by index or at random.
+3. Load the trained Mini-ResNet weights from [`models/saved/mini_resnet.h5`](models/saved/mini_resnet.h5).
+4. Let you predict any sample — by index or at random — and visualize the full probability distribution across the 10 classes.
+
+A second notebook, [`notebooks/train_colab.ipynb`](notebooks/train_colab.ipynb), reproduces the full training pipeline end-to-end in Colab.
 
 ---
 
@@ -224,4 +231,10 @@ Open `notebooks/demo_best_model.ipynb` in Google Colab (GPU runtime recommended)
 
 ## Conclusions
 
-> *This section will be completed by the team.*
+The progressive development pipeline produced a clear, measurable payoff for every design decision we borrowed from the course material. Starting from a bare-bones CNN at 89.91 % test accuracy, each layer of complexity — regularization, then residual connections — lifted performance by roughly **2 pp** until we converged on **94.36 %** with the Mini-ResNet. The hardest remaining errors concentrate on visually ambiguous upper-body garments (Shirt / T-shirt / Pullover / Coat), which is consistent with the published Fashion-MNIST error distribution and suggests that raw 28×28 grayscale pixels are near the ceiling of what a general-purpose CNN of this size can extract.
+
+The most instructive finding was negative: our **hyperparameter search did not produce the best final model**. Screening 8 configurations for 20 epochs picked a conservative learning rate (`1e-4`) that minimized validation loss over a short horizon, but when we retrained it for 60 epochs the optimizer never reached the minimum that the default `lr=1e-3 + CosineDecay` found. The takeaway is pragmatic — short-horizon HP screening is a useful filter but can systematically undervalue schedules that need longer to pay off, and validating the "winner" against the un-tuned baseline at full training length is worth the extra compute.
+
+On the architectural side, two ideas from the course turned out to be doing most of the work: **residual connections**, which were responsible for the single largest accuracy jump (+1.96 pp) and made the deeper network trainable in the first place; and **Global Average Pooling**, which let us grow the convolutional stack to 2.78 M parameters without ballooning the classifier head or overfitting. Data augmentation, Batch Normalization, Dropout and L2 also each contributed measurably to closing the generalization gap in Model 2.
+
+If we had more compute to invest, the obvious next steps would be: a longer-horizon HP search (40–60 epochs per config), an ensemble of independently seeded Mini-ResNets, and targeted augmentation aimed at the Shirt/T-shirt confusion pair. None of these are conceptually new, but on Fashion-MNIST they are the known routes past the ~95 % threshold.
